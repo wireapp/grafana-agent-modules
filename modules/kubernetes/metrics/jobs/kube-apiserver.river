@@ -72,15 +72,15 @@ argument "clustering" {
 
 // kube-apiserver service discovery
 discovery.kubernetes "kube_apiserver" {
-  role = "service"
+  role = "pod"
 
   selectors {
-    role = "service"
-    field = "metadata.name=" + coalesce(argument.service.value, "kubernetes")
+    role = "pod"
+    label = "k8s-app=kube-apiserver"
   }
 
   namespaces {
-    names = [coalesce(argument.namespace.value, "default")]
+    names = [coalesce(argument.namespace.value, "kube-system")]
   }
 }
 
@@ -99,13 +99,6 @@ discovery.relabel "kube_apiserver" {
     action = "drop"
   }
 
-  // only keep targets with a matching port name
-  rule {
-    source_labels = ["__meta_kubernetes_service_port_name"]
-    regex = coalesce(argument.port_name.value, "https")
-    action = "keep"
-  }
-
   // set the namespace
   rule {
     action = "replace"
@@ -113,11 +106,20 @@ discovery.relabel "kube_apiserver" {
     target_label = "namespace"
   }
 
-  // set the service_name
+  // set the node name
   rule {
     action = "replace"
-    source_labels = ["__meta_kubernetes_service_name"]
-    target_label = "service"
+    source_labels = ["__meta_kubernetes_pod_node_name"]
+    target_label = "instance"
+  }
+
+  // set the port
+  rule {
+    action = "replace"
+    source_labels = [ "__address__"]
+    target_label = "__address__"
+    regex = "(.*)"
+    replacement = "$1:6443"
   }
 }
 
